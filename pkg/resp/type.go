@@ -2,6 +2,7 @@ package resp
 
 import (
 	"bytes"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -67,7 +68,7 @@ func (s SimpleString) Resp() []byte {
 }
 
 func (s SimpleString) String() string {
-	return "SimpleString"
+	return "SimpleString(" + string(s) + ")"
 }
 
 // ---------------------------------
@@ -81,7 +82,7 @@ func (e SimpleError) Resp() []byte {
 }
 
 func (e SimpleError) String() string {
-	return "SimpleError"
+	return "SimpleError(" + string(e) + ")"
 }
 
 // ---------------------------------
@@ -95,7 +96,7 @@ func (n Number) Resp() []byte {
 }
 
 func (n Number) String() string {
-	return "Number"
+	return fmt.Sprintf("Number(%d)", n)
 }
 
 // ---------------------------------

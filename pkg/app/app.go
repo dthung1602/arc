@@ -68,14 +68,16 @@ func (app *App) handle(conn net.Conn) {
 	log.Println("Processing ...")
 
 	r := bufio.NewReaderSize(conn, app.Config.GetInt("buffersize"))
-	resp, err := app.parser.Parse(r)
 
-	if err != nil {
-		panic(err)
+	for {
+		resp, err := app.parser.Parse(r)
+
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Printf("GOT COMMAND: %v\n", resp)
 	}
 
-	fmt.Printf("GOT COMMAND: %v\n", resp)
-
-	conn.Close()
 	log.Println("Closed connection")
 }

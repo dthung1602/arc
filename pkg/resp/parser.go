@@ -32,6 +32,79 @@ func (p Parser) Parse(r *bufio.Reader) (Resp, error) {
 	}
 }
 
+func (p Parser) parseBlobString(r *bufio.Reader) (BlobString, error) {
+	_, _ = r.ReadByte()
+
+	blobStrLen, err := readLen(r)
+	if err != nil {
+		return nil, err
+	}
+
+	blobString := make(BlobString, blobStrLen)
+	n, err := r.Read(blobString)
+	if err != nil {
+		return nil, err
+	}
+	if n != blobStrLen {
+		return nil, errors.New("missing bytes when reading blob string")
+	}
+
+	nextBytes, err := r.ReadBytes('\n')
+	if err != nil {
+		return nil, err
+	}
+	if len(nextBytes) != 2 || nextBytes[0] != '\r' {
+		return nil, errors.New("missing crnl at the end of blob string")
+	}
+
+	return blobString, nil
+}
+
+func (p Parser) parseSimpleString(r *bufio.Reader) (SimpleString, error) {
+	_, _ = r.Discard(1)
+	return readTillCRNL(r)
+}
+
+func (p Parser) parseSimpleError(r *bufio.Reader) (SimpleError, error) {
+	_, _ = r.Discard(1)
+	return readTillCRNL(r)
+}
+
+func (p Parser) parseNumber(r *bufio.Reader) (Number, error) {
+	_, _ = r.Discard(1)
+	buff, err := readTillCRNL(r)
+	if err != nil {
+		return 0, err
+	}
+	n, err := strconv.ParseInt(string(buff), 10, 64)
+	return Number(n), err
+}
+
+func (p Parser) parseArray(r *bufio.Reader) (Array, error) {
+	_, _ = r.ReadByte()
+
+	arrayLen, err := readLen(r)
+	if err != nil {
+		return nil, err
+	}
+
+	arr := make(Array, arrayLen)
+
+	for i := 0; i < arrayLen; i++ {
+		ele, err := p.Parse(r)
+		if err != nil {
+			return nil, err
+		}
+		arr[i] = ele
+	}
+
+	return arr, nil
+}
+
+// ---------------------------------
+//	Utils functions
+// ---------------------------------
+
 // TODO handle when payload is too large
 func readTillCRNL(r *bufio.Reader) ([]byte, error) {
 	var data [][]byte
@@ -67,65 +140,4 @@ func readLen(r *bufio.Reader) (int, error) {
 		return -1, errors.New("blob string length cannot be negative")
 	}
 	return n, nil
-}
-
-func (p Parser) parseBlobString(r *bufio.Reader) (BlobString, error) {
-	_, _ = r.ReadByte()
-
-	blobStrLen, err := readLen(r)
-	if err != nil {
-		return nil, err
-	}
-
-	blobString := make(BlobString, blobStrLen)
-	n, err := r.Read(blobString)
-	if err != nil {
-		return nil, err
-	}
-	if n != blobStrLen {
-		return nil, errors.New("missing bytes when reading blob string")
-	}
-
-	nextBytes, err := r.ReadBytes('\n')
-	if err != nil {
-		return nil, err
-	}
-	if len(nextBytes) != 2 || nextBytes[0] != '\r' {
-		return nil, errors.New("missing crnl at the end of blob string")
-	}
-
-	return blobString, nil
-}
-
-func (p Parser) parseSimpleString(r *bufio.Reader) (SimpleString, error) {
-	return nil, nil
-}
-
-func (p Parser) parseSimpleError(r *bufio.Reader) (SimpleError, error) {
-	return nil, nil
-}
-
-func (p Parser) parseNumber(r *bufio.Reader) (Number, error) {
-	return 0, nil
-}
-
-func (p Parser) parseArray(r *bufio.Reader) (Array, error) {
-	_, _ = r.ReadByte()
-
-	arrayLen, err := readLen(r)
-	if err != nil {
-		return nil, err
-	}
-
-	arr := make(Array, arrayLen)
-
-	for i := 0; i < arrayLen; i++ {
-		ele, err := p.Parse(r)
-		if err != nil {
-			return nil, err
-		}
-		arr[i] = ele
-	}
-
-	return arr, nil
 }
