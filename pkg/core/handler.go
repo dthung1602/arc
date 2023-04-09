@@ -3,7 +3,9 @@ package core
 import (
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/dthung1602/arc/pkg/resp"
@@ -43,6 +45,7 @@ func CommandHandlerFactoryImpl(arr resp.Array) (CommandHandler, error) {
 
 var cmdMapping = map[string]CommandHandler{
 	"COMMAND": &CommandCommandHandler{},
+	"INFO":    &InfoCommandHandler{},
 	"GET":     &GetCommandHandler{},
 	"SET":     &SetCommandHandler{},
 	"KEYS":    &KeysCommandHandler{},
@@ -57,6 +60,37 @@ type CommandCommandHandler struct{}
 func (handler CommandCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 	return resp.EmptyArray, nil
 }
+
+// ---------------------------------
+//	INFO
+// ---------------------------------
+
+type InfoCommandHandler struct{}
+
+func (handler InfoCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
+	data := fmt.Sprintf(
+		infoStr,
+		"0.0.1",
+		runtime.GOOS,
+		runtime.GOARCH,
+		os.Getpid(),
+	)
+	return resp.VerbatimString{
+		Data: []byte(data),
+		Ext:  resp.VStrExtText,
+	}, nil
+}
+
+const infoStr = `#---------------------------------
+#    ARC - Another Redis Clone
+#---------------------------------
+
+arc_version:%s
+os:%s
+arch:%s
+process_id:%d
+
+`
 
 // ---------------------------------
 //	GET

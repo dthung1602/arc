@@ -19,6 +19,8 @@ func (p Parser) Parse(r *bufio.Reader) (Resp, error) {
 	switch ch[0] {
 	case '$':
 		return p.ParseBlobString(r)
+	case '=':
+		return p.ParseVerbatimString(r)
 	case '+':
 		return p.ParseSimpleString(r)
 	case '-':
@@ -56,25 +58,59 @@ func (p Parser) ParseBlobString(r *bufio.Reader) (BlobString, error) {
 		return nil, err
 	}
 	if len(nextBytes) != 2 || nextBytes[0] != '\r' {
-		return nil, errors.New("missing crnl at the end of blob string")
+		return nil, errors.New("missing CRLF at the end of blob string")
 	}
 
 	return blobString, nil
 }
 
+func (p Parser) ParseVerbatimString(r *bufio.Reader) (VerbatimString, error) {
+	_, _ = r.ReadByte()
+
+	verStrLen, err := readLen(r)
+	if err != nil {
+		return VerbatimString{}, err
+	}
+
+	verString := make([]byte, verStrLen)
+	n, err := r.Read(verString)
+	if err != nil {
+		return VerbatimString{}, err
+	}
+	if n != verStrLen {
+		return VerbatimString{}, errors.New("missing bytes when reading verbatim string")
+	}
+	if verStrLen < 4 || verString[3] != ':' {
+		return VerbatimString{}, errors.New("verbatim string must have extension type")
+	}
+
+	nextBytes, err := r.ReadBytes('\n')
+	if err != nil {
+		return VerbatimString{}, err
+	}
+	if len(nextBytes) != 2 || nextBytes[0] != '\r' {
+		return VerbatimString{}, errors.New("missing CRLF at the end of blob string")
+	}
+
+	return VerbatimString{
+		Data: verString[4:],
+		Ext:  verString[0:3],
+	}, nil
+}
+
 func (p Parser) ParseSimpleString(r *bufio.Reader) (SimpleString, error) {
 	_, _ = r.Discard(1)
-	return readTillCRNL(r)
+	return readTillCRLF(r)
 }
 
 func (p Parser) ParseSimpleError(r *bufio.Reader) (SimpleError, error) {
 	_, _ = r.Discard(1)
-	return readTillCRNL(r)
+	return readTillCRLF(r)
 }
 
 func (p Parser) ParseNumber(r *bufio.Reader) (Number, error) {
 	_, _ = r.Discard(1)
-	buff, err := readTillCRNL(r)
+	buff, err := readTillCRLF(r)
 	if err != nil {
 		return 0, err
 	}
@@ -105,7 +141,7 @@ func (p Parser) ParseArray(r *bufio.Reader) (Array, error) {
 
 func (p Parser) ParseNull(r *bufio.Reader) (Null, error) {
 	_, _ = r.ReadByte()
-	buf, err := readTillCRNL(r)
+	buf, err := readTillCRLF(r)
 	if len(buf) != 0 {
 		err = errors.New("invalid null value")
 	}
@@ -117,7 +153,7 @@ func (p Parser) ParseNull(r *bufio.Reader) (Null, error) {
 // ---------------------------------
 
 // TODO handle when payload is too large
-func readTillCRNL(r *bufio.Reader) ([]byte, error) {
+func readTillCRLF(r *bufio.Reader) ([]byte, error) {
 	var data [][]byte
 	for {
 		buff, err := r.ReadBytes('\r')
@@ -139,7 +175,7 @@ func readTillCRNL(r *bufio.Reader) ([]byte, error) {
 }
 
 func readLen(r *bufio.Reader) (int, error) {
-	lenStr, err := readTillCRNL(r)
+	lenStr, err := readTillCRLF(r)
 	if err != nil {
 		return -1, err
 	}

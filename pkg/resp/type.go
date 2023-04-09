@@ -83,7 +83,7 @@ func (s BlobString) Resp() []byte {
 }
 
 func (s BlobString) String() string {
-	return "BlobString(" + string([]byte(s)) + ")"
+	return "BlobString(" + string(s) + ")"
 }
 
 func (s BlobString) ToByteSlice() []byte {
@@ -92,6 +92,38 @@ func (s BlobString) ToByteSlice() []byte {
 
 func (s BlobString) ToRawStr() string {
 	return string(s)
+}
+
+// ---------------------------------
+//	VerbatimString =
+// ---------------------------------
+
+type VerbatimString struct {
+	Data []byte
+	Ext  []byte
+}
+
+func (s VerbatimString) Resp() []byte {
+	contentLen := 4 + len(s.Data)
+	lengthStr := []byte(strconv.Itoa(contentLen))
+	lls := len(lengthStr)
+	totalLen := 5 + lls + contentLen
+	result := make([]byte, totalLen)
+
+	result[0] = '='
+	copy(result[1:], lengthStr)
+	result[lls+1] = '\r'
+	result[lls+2] = '\n'
+	copy(result[lls+3:], s.Ext)
+	result[lls+6] = ':'
+	copy(result[lls+7:], s.Data)
+	result[totalLen-2] = '\r'
+	result[totalLen-1] = '\n'
+	return result
+}
+
+func (s VerbatimString) String() string {
+	return "VerbatimString(" + string(s.Ext) + ":" + string(s.Data) + ")"
 }
 
 // ---------------------------------
@@ -207,3 +239,5 @@ var EmptySimpleString = SimpleString("")
 var OKString = SimpleString("OK")
 var EmptyArray = Array{}
 var NullVal = Null{}
+var VStrExtText = []byte("txt")
+var VStrExtMarkDown = []byte("mkd")
