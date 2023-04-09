@@ -29,7 +29,7 @@ func (conf Config) readFromFile(filePath string) error {
 
 func (conf Config) readFromEnv() error {
 	// TODO read from ENV
-	conf["port"] = 6379
+	conf["port"] = 6378
 	conf["buffersize"] = 128 * 1024 // 128kb
 	return nil
 }

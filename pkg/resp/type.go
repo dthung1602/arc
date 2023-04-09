@@ -16,7 +16,9 @@ type Resp interface {
 	String() string
 }
 
-type RespByteSlice interface {
+type RespString interface {
+	Resp() []byte
+	String() string
 	ToByteSlice() []byte
 	ToRawStr() string
 }
@@ -36,12 +38,26 @@ func simpleResp(s []byte, marker byte) []byte {
 	return result
 }
 
-func ToRespByteSlice(resp Resp) []byte {
-	s, isStr := resp.(RespByteSlice)
+func ToByteSlice(resp Resp) []byte {
+	s, isStr := resp.(RespString)
 	if isStr {
 		return s.ToByteSlice()
 	}
 	return nil
+}
+
+func ByteSliceToRespString(bs []byte) RespString {
+	if len(bs) < 128 {
+		return SimpleString(bs)
+	}
+	return BlobString(bs)
+}
+
+func StrToRespString(s string) RespString {
+	if len(s) < 128 {
+		return SimpleString(s)
+	}
+	return BlobString(s)
 }
 
 // ---------------------------------

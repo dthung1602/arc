@@ -3,8 +3,10 @@ package core
 import (
 	"errors"
 	"fmt"
-	"github.com/dthung1602/arc/pkg/resp"
+	"regexp"
 	"strings"
+
+	"github.com/dthung1602/arc/pkg/resp"
 )
 
 // ---------------------------------
@@ -26,7 +28,7 @@ func CommandHandlerFactoryImpl(arr resp.Array) (CommandHandler, error) {
 		return nil, errors.New("empty request")
 	}
 
-	cmdBS := arr[0].(resp.RespByteSlice)
+	cmdBS := arr[0].(resp.RespString)
 	if cmdBS == nil {
 		return nil, errors.New("command must be a string")
 	}
@@ -43,6 +45,7 @@ var cmdMapping = map[string]CommandHandler{
 	"COMMAND": &CommandCommandHandler{},
 	"GET":     &GetCommandHandler{},
 	"SET":     &SetCommandHandler{},
+	"KEYS":    &KeysCommandHandler{},
 }
 
 // ---------------------------------
@@ -66,7 +69,7 @@ func (handler GetCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 		return nil, errors.New("wrong number of parameter for GET")
 	}
 
-	key := resp.ToRespByteSlice(req[1])
+	key := resp.ToByteSlice(req[1])
 	if key == nil {
 		return nil, errors.New("key must be of type string")
 	}
@@ -75,10 +78,7 @@ func (handler GetCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 	if val == nil {
 		return resp.NullVal, nil
 	}
-	if len(val) < 128 {
-		return resp.SimpleString(val), nil
-	}
-	return resp.BlobString(val), nil
+	return resp.ByteSliceToRespString(val), nil
 }
 
 // ---------------------------------
@@ -92,12 +92,12 @@ func (handler SetCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 		return nil, errors.New("wrong number of parameter for SET")
 	}
 
-	key := resp.ToRespByteSlice(req[1])
+	key := resp.ToByteSlice(req[1])
 	if key == nil {
 		return nil, errors.New("key must be of type string")
 	}
 
-	val := resp.ToRespByteSlice(req[2])
+	val := resp.ToByteSlice(req[2])
 	if key == nil {
 		return nil, errors.New("value must be of type string")
 	}
@@ -105,4 +105,37 @@ func (handler SetCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 	hashMapInstance.Set(key, val)
 
 	return resp.OKString, nil
+}
+
+// ---------------------------------
+//	KEYS
+// ---------------------------------
+
+type KeysCommandHandler struct{}
+
+func (handler KeysCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
+	if len(req) != 2 {
+		return nil, errors.New("wrong number of parameter for KEYS")
+	}
+
+	rawPattern := resp.ToByteSlice(req[1])
+	if rawPattern == nil {
+		return nil, errors.New("pattern must be of type string")
+	}
+
+	pattern, err := regexp.CompilePOSIX("^" + strings.Replace(string(rawPattern), "*", ".*", -1) + "$")
+	if err != nil {
+		return nil, err
+	}
+
+	existingKeys := resp.Array{}
+
+	for key := range hashMapInstance {
+		match := pattern.FindStringIndex(key)
+		if match != nil {
+			existingKeys = append(existingKeys, resp.StrToRespString(key))
+		}
+	}
+
+	return existingKeys, nil
 }
