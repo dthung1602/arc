@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/dthung1602/arc/pkg/core"
 	"github.com/dthung1602/arc/pkg/resp"
+	"io"
 	"log"
 	"net"
 )
@@ -71,29 +72,47 @@ func (app *App) handle(conn net.Conn) {
 	log.Println("Processing ...")
 
 	r := bufio.NewReaderSize(conn, app.Config.GetInt("buffersize"))
-	defer conn.Close()
+	defer func() {
+		conn.Close()
+		log.Println("Closed connection")
+	}()
 
 	for {
 		request, err := app.Parser.ParseArray(r)
 		if err != nil {
-			// TODO handle close connection error
-			panic(err)
+			if err == io.EOF {
+				log.Println("Done processing")
+				break
+			}
+			writeError(conn, err)
+			continue
 		}
-		log.Printf("Got command: %v\n", request)
+		log.Printf("Received: %v\n", request)
 
 		handler, err := app.CommandHandlerFactory(request)
 		if err != nil {
-			// TODO handle error
-			panic(err)
+			writeError(conn, err)
+			continue
 		}
 		response, err := handler.Handle(request)
 		if err != nil {
-			panic(err)
+			writeError(conn, err)
+			continue
 		}
 
-		_, err = conn.Write(response.Resp())
-		if err != nil {
-			panic(err)
-		}
+		writeResponse(conn, response)
 	}
+}
+
+func writeResponse(conn net.Conn, res resp.Resp) {
+	log.Printf("Responsed: %s", res.String())
+	_, err := conn.Write(res.Resp())
+	if err != nil {
+		panic(err)
+	}
+}
+
+func writeError(conn net.Conn, err error) {
+	log.Printf("Error occured: %v\n", err)
+	writeResponse(conn, resp.NewSimpleError(err))
 }

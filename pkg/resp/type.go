@@ -114,6 +114,10 @@ func (e SimpleError) String() string {
 	return "SimpleError(" + string(e) + ")"
 }
 
+func NewSimpleError(err error) SimpleError {
+	return SimpleError(err.Error())
+}
+
 // ---------------------------------
 //	Number :
 // ---------------------------------
@@ -149,6 +153,10 @@ func (a Array) Resp() []byte {
 }
 
 func (a Array) String() string {
+	if len(a) == 0 {
+		return "Array[]"
+	}
+
 	var eleStrs []string
 
 	for i := 0; i < len(a); i++ {

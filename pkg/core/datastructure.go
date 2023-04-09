@@ -6,8 +6,11 @@ var hashMapInstance = make(HashMap)
 
 func (m *HashMap) Get(key []byte) []byte {
 	val := (*m)[string(key)]
+	if val == nil {
+		return nil
+	}
 	data := make([]byte, len(val))
-	copy(data, val) // TODO should copy
+	copy(data, val) // TODO should copy?
 	return data
 }
 
