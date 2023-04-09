@@ -3,24 +3,27 @@ package app
 import (
 	"bufio"
 	"fmt"
+	"github.com/dthung1602/arc/pkg/core"
 	"github.com/dthung1602/arc/pkg/resp"
 	"log"
 	"net"
 )
 
 type App struct {
-	Config   Config
-	stopChan chan bool
-	stopped  bool
-	parser   resp.Parser
+	Config                Config
+	Parser                resp.Parser
+	CommandHandlerFactory core.CommandHandlerFactory
+	stopChan              chan bool
+	stopped               bool
 }
 
 func NewApp() (*App, error) {
 	app := App{
-		Config:   Config{},
-		stopChan: make(chan bool),
-		stopped:  false,
-		parser:   resp.Parser{},
+		Config:                Config{},
+		Parser:                resp.Parser{},
+		CommandHandlerFactory: core.CommandHandlerFactoryImpl,
+		stopChan:              make(chan bool),
+		stopped:               false,
 	}
 	if err := app.Config.Read(); err != nil {
 		return nil, err
@@ -68,16 +71,29 @@ func (app *App) handle(conn net.Conn) {
 	log.Println("Processing ...")
 
 	r := bufio.NewReaderSize(conn, app.Config.GetInt("buffersize"))
+	defer conn.Close()
 
 	for {
-		resp, err := app.parser.Parse(r)
+		request, err := app.Parser.ParseArray(r)
+		if err != nil {
+			// TODO handle close connection error
+			panic(err)
+		}
+		log.Printf("Got command: %v\n", request)
 
+		handler, err := app.CommandHandlerFactory(request)
+		if err != nil {
+			// TODO handle error
+			panic(err)
+		}
+		response, err := handler.Handle(request)
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Printf("GOT COMMAND: %v\n", resp)
+		_, err = conn.Write(response.Resp())
+		if err != nil {
+			panic(err)
+		}
 	}
-
-	log.Println("Closed connection")
 }

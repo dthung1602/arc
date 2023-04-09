@@ -16,6 +16,11 @@ type Resp interface {
 	String() string
 }
 
+type RespByteSlice interface {
+	ToByteSlice() []byte
+	ToRawStr() string
+}
+
 // ---------------------------------
 //	Util functions
 // ---------------------------------
@@ -29,6 +34,14 @@ func simpleResp(s []byte, marker byte) []byte {
 	result[totalLen-2] = '\r'
 	result[totalLen-1] = '\n'
 	return result
+}
+
+func ToRespByteSlice(resp Resp) []byte {
+	s, isStr := resp.(RespByteSlice)
+	if isStr {
+		return s.ToByteSlice()
+	}
+	return nil
 }
 
 // ---------------------------------
@@ -57,6 +70,14 @@ func (s BlobString) String() string {
 	return "BlobString(" + string([]byte(s)) + ")"
 }
 
+func (s BlobString) ToByteSlice() []byte {
+	return s
+}
+
+func (s BlobString) ToRawStr() string {
+	return string(s)
+}
+
 // ---------------------------------
 //	SimpleString +
 // ---------------------------------
@@ -69,6 +90,14 @@ func (s SimpleString) Resp() []byte {
 
 func (s SimpleString) String() string {
 	return "SimpleString(" + string(s) + ")"
+}
+
+func (s SimpleString) ToByteSlice() []byte {
+	return s
+}
+
+func (s SimpleString) ToRawStr() string {
+	return string(s)
 }
 
 // ---------------------------------
@@ -130,3 +159,27 @@ func (a Array) String() string {
 	}
 	return "Array[\n    " + strings.Join(eleStrs, ",\n    ") + "\n]"
 }
+
+// ---------------------------------
+//	Null _
+// ---------------------------------
+
+type Null struct{}
+
+func (n Null) Resp() []byte {
+	return []byte("_\r\n")
+}
+
+func (n Null) String() string {
+	return "Null"
+}
+
+// ---------------------------------
+//	Common constants
+// ---------------------------------
+
+var EmptyBlobString = BlobString("")
+var EmptySimpleString = SimpleString("")
+var OKString = SimpleString("OK")
+var EmptyArray = Array{}
+var NullVal = Null{}

@@ -18,21 +18,23 @@ func (p Parser) Parse(r *bufio.Reader) (Resp, error) {
 
 	switch ch[0] {
 	case '$':
-		return p.parseBlobString(r)
+		return p.ParseBlobString(r)
 	case '+':
-		return p.parseSimpleString(r)
+		return p.ParseSimpleString(r)
 	case '-':
-		return p.parseSimpleError(r)
+		return p.ParseSimpleError(r)
 	case ':':
-		return p.parseNumber(r)
+		return p.ParseNumber(r)
 	case '*':
-		return p.parseArray(r)
+		return p.ParseArray(r)
+	case '_':
+		return p.ParseNull(r)
 	default:
 		return nil, fmt.Errorf("unreconized type %b", ch[0])
 	}
 }
 
-func (p Parser) parseBlobString(r *bufio.Reader) (BlobString, error) {
+func (p Parser) ParseBlobString(r *bufio.Reader) (BlobString, error) {
 	_, _ = r.ReadByte()
 
 	blobStrLen, err := readLen(r)
@@ -60,17 +62,17 @@ func (p Parser) parseBlobString(r *bufio.Reader) (BlobString, error) {
 	return blobString, nil
 }
 
-func (p Parser) parseSimpleString(r *bufio.Reader) (SimpleString, error) {
+func (p Parser) ParseSimpleString(r *bufio.Reader) (SimpleString, error) {
 	_, _ = r.Discard(1)
 	return readTillCRNL(r)
 }
 
-func (p Parser) parseSimpleError(r *bufio.Reader) (SimpleError, error) {
+func (p Parser) ParseSimpleError(r *bufio.Reader) (SimpleError, error) {
 	_, _ = r.Discard(1)
 	return readTillCRNL(r)
 }
 
-func (p Parser) parseNumber(r *bufio.Reader) (Number, error) {
+func (p Parser) ParseNumber(r *bufio.Reader) (Number, error) {
 	_, _ = r.Discard(1)
 	buff, err := readTillCRNL(r)
 	if err != nil {
@@ -80,7 +82,7 @@ func (p Parser) parseNumber(r *bufio.Reader) (Number, error) {
 	return Number(n), err
 }
 
-func (p Parser) parseArray(r *bufio.Reader) (Array, error) {
+func (p Parser) ParseArray(r *bufio.Reader) (Array, error) {
 	_, _ = r.ReadByte()
 
 	arrayLen, err := readLen(r)
@@ -99,6 +101,15 @@ func (p Parser) parseArray(r *bufio.Reader) (Array, error) {
 	}
 
 	return arr, nil
+}
+
+func (p Parser) ParseNull(r *bufio.Reader) (Null, error) {
+	_, _ = r.ReadByte()
+	buf, err := readTillCRNL(r)
+	if len(buf) != 0 {
+		err = errors.New("invalid null value")
+	}
+	return NullVal, err
 }
 
 // ---------------------------------
