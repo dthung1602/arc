@@ -49,6 +49,7 @@ var cmdMapping = map[string]CommandHandler{
 	"GET":     &GetCommandHandler{},
 	"SET":     &SetCommandHandler{},
 	"KEYS":    &KeysCommandHandler{},
+	"TYPE":    &TypeCommandHandler{},
 }
 
 // ---------------------------------
@@ -162,6 +163,8 @@ func (handler KeysCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 		return nil, err
 	}
 
+	// TODO escape other regex except *
+
 	existingKeys := resp.Array{}
 
 	for key := range hashMapInstance {
@@ -172,4 +175,33 @@ func (handler KeysCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 	}
 
 	return existingKeys, nil
+}
+
+// ---------------------------------
+//	KEYS
+// ---------------------------------
+
+type TypeCommandHandler struct{}
+
+func (handler TypeCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
+	if len(req) != 2 {
+		return nil, errors.New("wrong number of parameter for TYPE")
+	}
+
+	rawPattern := resp.ToByteSlice(req[1])
+	if rawPattern == nil {
+		return nil, errors.New("pattern must be of type string")
+	}
+
+	pattern := string(rawPattern)
+
+	_, hasKey := hashMapInstance[pattern]
+	if hasKey {
+		return resp.StrToRespString("string"), nil
+	}
+
+	// TODO check if key in other data structures
+
+	// key not found anywhere
+	return resp.StrToRespString("none"), nil
 }
