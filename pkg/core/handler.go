@@ -46,10 +46,10 @@ func CommandHandlerFactoryImpl(arr resp.Array) (CommandHandler, error) {
 var cmdMapping = map[string]CommandHandler{
 	"COMMAND": &CommandCommandHandler{},
 	"INFO":    &InfoCommandHandler{},
-	"GET":     &GetCommandHandler{},
-	"SET":     &SetCommandHandler{},
-	"KEYS":    &KeysCommandHandler{},
-	"TYPE":    &TypeCommandHandler{},
+	"GET":     &GetCommandHandler{keySpace: GetRootKeySpace()},
+	"SET":     &SetCommandHandler{keySpace: GetRootKeySpace()},
+	"KEYS":    &KeysCommandHandler{keySpace: GetRootKeySpace()},
+	"TYPE":    &TypeCommandHandler{keySpace: GetRootKeySpace()},
 }
 
 // ---------------------------------
@@ -97,7 +97,9 @@ process_id:%d
 //	GET
 // ---------------------------------
 
-type GetCommandHandler struct{}
+type GetCommandHandler struct {
+	keySpace *KeySpace
+}
 
 func (handler GetCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 	if len(req) != 2 {
@@ -109,18 +111,25 @@ func (handler GetCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 		return nil, errors.New("key must be of type string")
 	}
 
-	val := hashMapInstance.Get(key)
+	val := handler.keySpace.Get(key)
 	if val == nil {
 		return resp.NullVal, nil
 	}
-	return resp.ByteSliceToRespString(val), nil
+
+	b, ok := val.(InternalBytes)
+	if ok {
+		return resp.ByteSliceToRespString(b), nil
+	}
+	return nil, errors.New("wrong type")
 }
 
 // ---------------------------------
 //	SET
 // ---------------------------------
 
-type SetCommandHandler struct{}
+type SetCommandHandler struct {
+	keySpace *KeySpace
+}
 
 func (handler SetCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 	if len(req) != 3 {
@@ -133,11 +142,11 @@ func (handler SetCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 	}
 
 	val := resp.ToByteSlice(req[2])
-	if key == nil {
+	if val == nil {
 		return nil, errors.New("value must be of type string")
 	}
 
-	hashMapInstance.Set(key, val)
+	handler.keySpace.Set(key, InternalBytes(val))
 
 	return resp.OKString, nil
 }
@@ -146,7 +155,9 @@ func (handler SetCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 //	KEYS
 // ---------------------------------
 
-type KeysCommandHandler struct{}
+type KeysCommandHandler struct {
+	keySpace *KeySpace
+}
 
 func (handler KeysCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 	if len(req) != 2 {
@@ -167,7 +178,7 @@ func (handler KeysCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 
 	existingKeys := resp.Array{}
 
-	for key := range hashMapInstance {
+	for key := range *handler.keySpace {
 		match := pattern.FindStringIndex(key)
 		if match != nil {
 			existingKeys = append(existingKeys, resp.StrToRespString(key))
@@ -178,24 +189,24 @@ func (handler KeysCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 }
 
 // ---------------------------------
-//	KEYS
+//	TYPE
 // ---------------------------------
 
-type TypeCommandHandler struct{}
+type TypeCommandHandler struct {
+	keySpace *KeySpace
+}
 
 func (handler TypeCommandHandler) Handle(req resp.Array) (resp.Resp, error) {
 	if len(req) != 2 {
 		return nil, errors.New("wrong number of parameter for TYPE")
 	}
 
-	rawPattern := resp.ToByteSlice(req[1])
-	if rawPattern == nil {
+	rawKey := resp.ToByteSlice(req[1])
+	if rawKey == nil {
 		return nil, errors.New("pattern must be of type string")
 	}
 
-	pattern := string(rawPattern)
-
-	_, hasKey := hashMapInstance[pattern]
+	_, hasKey := (*handler.keySpace)[string(rawKey)]
 	if hasKey {
 		return resp.StrToRespString("string"), nil
 	}

@@ -11,22 +11,44 @@ import (
 )
 
 func executeAndCompare(t *testing.T, testFileName string) {
-	inputBytes, _ := os.ReadFile("test/data/" + testFileName + "_commands.txt")
+	inputBytes, err := os.ReadFile("test/data/" + testFileName + "_commands.txt")
+	if err != nil {
+		panic(err)
+	}
 	expectedBytes, _ := os.ReadFile("test/data/" + testFileName + "_expected_outputs.txt")
+	if err != nil {
+		panic(err)
+	}
 	input := string(inputBytes)
 	expected := string(expectedBytes)
 
 	cmd := exec.Command("redis-cli", "-p", "6378")
 
-	stdin, _ := cmd.StdinPipe()
-	stdout, _ := cmd.StdoutPipe()
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		panic(err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		panic(err)
+	}
 	defer stdout.Close()
 
-	cmd.Start()
-	io.WriteString(stdin, input)
+	err = cmd.Start()
+	if err != nil {
+		panic(err)
+	}
+	_, err = io.WriteString(stdin, input)
+	if err != nil {
+		panic(err)
+	}
+
 	stdin.Close()
 	builder := new(strings.Builder)
-	io.Copy(builder, stdout)
+	_, err = io.Copy(builder, stdout)
+	if err != nil {
+		panic(err)
+	}
 
 	if expected != builder.String() {
 		t.Error("redis-cli doesn't return what expected")
